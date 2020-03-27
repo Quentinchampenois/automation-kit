@@ -1,0 +1,60 @@
+version: "3"
+
+services:
+  traefik:
+    image: traefik:1.7.2-alpine
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - $PWD/traefik.toml:/traefik.toml
+      - $PWD/acme.json:/acme.json
+    ports:
+      - 80:80
+      - 443:443
+    labels:
+      - traefik.frontend.rule=Host:${API_SUBDOMAIN}.${DOMAIN_NAME}
+      - traefik.port=${API_PORT}
+    networks:
+      - web
+
+  blog:
+    image: wordpress:4.9.8-apache
+    environment:
+      WORDPRESS_DB_PASSWORD: ${WP_DB_PASSWORD}
+    labels:
+      - traefik.backend=blog
+      - traefik.frontend.rule=Host:${WP_SUBDOMAIN}.${DOMAIN_NAME}
+      - traefik.docker.network=web
+      - traefik.port=${WP_PORT}
+    networks:
+      - internal
+      - web
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    networks:
+      - internal
+    labels:
+      - traefik.enable=false
+
+  adminer:
+    image: adminer:4.6.3-standalone
+    labels:
+      - traefik.backend=adminer
+      - traefik.frontend.rule=Host:${AD_SUBDOMAIN}.${DOMAIN_NAME}
+      - traefik.docker.network=web
+      - traefik.port=${AD_PORT}
+    networks:
+      - internal
+      - web
+    depends_on:
+      - mysql
+
+networks:
+  web:
+    external: true
+  internal:
+    external: false
